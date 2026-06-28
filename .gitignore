@@ -8,6 +8,10 @@ venv/
 env/
 
 output/
+output*.png
+
+__pycache__/
+*.py[cod]
 
 *.log
 

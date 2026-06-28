@@ -28,6 +28,8 @@ classifiers = [
 [project.optional-dependencies]
 # pip install "perfect-pixel[opencv]"
 opencv = ["opencv-python"]
+# pip install "perfect-pixel[web]"  -> local web UI (web/app.py)
+web = ["flask", "pillow"]
 
 [project.urls]
 "Homepage" = "https://github.com/theamusing/perfectPixel"

@@ -1,6 +1,6 @@
 import cv2
 import matplotlib.pyplot as plt
-from src.perfect_pixel import get_perfect_pixel
+from src.perfect_pixel import get_perfect_pixel, get_grid_preview
 
 path = "images/girl.jpg"
 # path = "images/avatar.png"
@@ -16,20 +16,31 @@ if bgr is None:
     raise FileNotFoundError(f"Cannot read image: {path}")
 rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
-w, h, out = get_perfect_pixel(rgb, sample_method="center", refine_intensity=0.3, debug=True)
+# Manually set the final grid here, or leave it None to auto-detect.
+grid_size = None  # e.g. (32, 32) to force an exact 32x32 result
+
+# Preview: overlay the grid on the original image before sampling.
+preview = get_grid_preview(rgb, grid_size=grid_size, refine_intensity=0.3)
+
+w, h, out = get_perfect_pixel(rgb, sample_method="center", grid_size=grid_size, refine_intensity=0.3, debug=False)
 
 if w is None or h is None:
     print("Failed to generate pixel-perfect image.")
     exit(1)
 
 # display
-plt.figure(figsize=(10, 4))
-plt.subplot(1, 2, 1)
+plt.figure(figsize=(14, 4))
+plt.subplot(1, 3, 1)
 plt.title("Input")
 plt.imshow(rgb)
 plt.axis("off")
 
-plt.subplot(1, 2, 2)
+plt.subplot(1, 3, 2)
+plt.title("Grid Preview")
+plt.imshow(preview if preview is not None else rgb)
+plt.axis("off")
+
+plt.subplot(1, 3, 3)
 plt.title(f"Pixel-perfect ({w}×{h})")
 plt.imshow(out)
 plt.axis("off")

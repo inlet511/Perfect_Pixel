@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Perfect Pixel</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <main class="container">
+    <h1>Perfect Pixel</h1>
+    <p class="subtitle">上传图片 · 设置网格 · 预览 · 处理 · 下载</p>
+
+    <section class="card">
+      <h2>1. 选择图片</h2>
+      <input type="file" id="file" accept="image/*" />
+    </section>
+
+    <section class="card">
+      <h2>2. 网格设置</h2>
+      <div class="row">
+        <label><input type="radio" name="mode" value="auto" checked /> 自动检测</label>
+        <label><input type="radio" name="mode" value="manual" /> 手动指定</label>
+      </div>
+
+      <div id="manual-fields" class="row hidden">
+        <label>宽格子数
+          <input type="number" id="grid_w" value="32" min="1" max="512" />
+        </label>
+        <label>高格子数
+          <input type="number" id="grid_h" value="32" min="1" max="512" />
+        </label>
+      </div>
+
+      <div class="row" id="refine-row">
+        <label>边缘对齐强度 (refine_intensity): <span id="ri_val">0.30</span>
+          <input type="range" id="refine_intensity" min="0" max="0.5" step="0.01" value="0.3" />
+        </label>
+      </div>
+
+      <div class="row">
+        <label>采样方式
+          <select id="sample_method">
+            <option value="center">center</option>
+            <option value="median">median</option>
+            <option value="majority">majority</option>
+          </select>
+        </label>
+        <label>导出放大倍数
+          <input type="number" id="export_scale" value="8" min="1" max="32" />
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3. 操作</h2>
+      <div class="row">
+        <button id="btn-preview">预览网格</button>
+        <button id="btn-process">处理</button>
+      </div>
+      <p id="status" class="status"></p>
+    </section>
+
+    <section class="card images">
+      <figure>
+        <figcaption>原图</figcaption>
+        <img id="img-original" alt="原图" />
+      </figure>
+      <figure>
+        <figcaption>网格预览 <span id="detected"></span></figcaption>
+        <img id="img-preview" alt="网格预览" />
+      </figure>
+      <figure>
+        <figcaption>结果 <span id="result-size"></span></figcaption>
+        <img id="img-result" alt="结果" class="pixelated" />
+      </figure>
+    </section>
+
+    <section class="card" id="download-card" style="display:none">
+      <h2>4. 下载</h2>
+      <div class="row">
+        <a id="dl-original" download="pixel_perfect.png">下载 PNG (原始尺寸)</a>
+        <a id="dl-scaled" download="pixel_perfect_scaled.png">下载放大版 PNG</a>
+      </div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>

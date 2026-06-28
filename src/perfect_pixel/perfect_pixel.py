@@ -354,6 +354,71 @@ def detect_grid_scale(image, peak_width=6, max_ratio=1.5, min_size=4.0):
 
     return grid_w, grid_h
 
+def uniform_grids(W, H, grid_x, grid_y):
+    """Evenly divide the image into grid_x * grid_y cells.
+
+    Returns x_coords/y_coords with exactly grid_x+1 / grid_y+1 lines, so that
+    sampling produces an output of exactly grid_x * grid_y cells.
+    """
+    x_coords = list(np.linspace(0, W, int(grid_x) + 1))
+    y_coords = list(np.linspace(0, H, int(grid_y) + 1))
+    return x_coords, y_coords
+
+def compute_grid_coords(image, grid_size=None, min_size=4.0, peak_width=6, refine_intensity=0.25):
+    """Decide the grid lines for an image.
+
+    If grid_size is given, the image is divided into exactly grid_size cells
+    (strict uniform division, no edge refinement). Otherwise the grid size is
+    auto-detected and refined to image edges.
+
+    Returns (x_coords, y_coords), or (None, None) on detection failure.
+    """
+    H, W = image.shape[:2]
+    if grid_size is not None:
+        gx, gy = int(round(grid_size[0])), int(round(grid_size[1]))
+        return uniform_grids(W, H, gx, gy)
+
+    scale_col, scale_row = detect_grid_scale(image, peak_width=peak_width, max_ratio=1.5, min_size=min_size)
+    if scale_col is None or scale_row is None:
+        return None, None
+    return refine_grids(image, int(round(scale_col)), int(round(scale_row)), refine_intensity)
+
+def draw_grid_overlay(image, x_coords, y_coords, color=(255, 0, 0), thickness=1):
+    """Draw grid lines over a copy of the image and return it (same dtype)."""
+    overlay = image.copy()
+    if overlay.ndim == 2:
+        overlay = np.stack([overlay] * 3, axis=-1)
+    H, W = overlay.shape[:2]
+    C = overlay.shape[2]
+    col = np.asarray(color[:C], dtype=overlay.dtype)
+    half = max(int(thickness), 1) // 2
+
+    for x in x_coords:
+        xi = int(round(x))
+        x0 = np.clip(xi - half, 0, W - 1)
+        x1 = np.clip(xi + half + 1, 0, W)
+        overlay[:, x0:x1] = col
+
+    for y in y_coords:
+        yi = int(round(y))
+        y0 = np.clip(yi - half, 0, H - 1)
+        y1 = np.clip(yi + half + 1, 0, H)
+        overlay[y0:y1, :] = col
+
+    return overlay
+
+def get_grid_preview(image, grid_size=None, min_size=4.0, peak_width=6,
+                     refine_intensity=0.25, color=(255, 0, 0), thickness=1):
+    """Return the original image with the detected/specified grid drawn on top.
+
+    Useful as an inspection step before sampling. Returns None if the grid
+    could not be determined.
+    """
+    x_coords, y_coords = compute_grid_coords(image, grid_size, min_size, peak_width, refine_intensity)
+    if x_coords is None:
+        return None
+    return draw_grid_overlay(image, x_coords, y_coords, color, thickness)
+
 def grid_layout(image, x_coords, y_coords, scale_x, scale_y):
     import matplotlib.pyplot as plt
     plt.figure()
@@ -381,18 +446,10 @@ def get_perfect_pixel(image, sample_method="center", grid_size = None, min_size 
         refined_w, refined_h, scaled_image
     """
     H, W = image.shape[:2]
-    if grid_size is not None:
-        # use provided grid size
-        scale_col, scale_row = grid_size
-    else:
-        scale_col, scale_row = detect_grid_scale(image, peak_width=peak_width, max_ratio=1.5, min_size=min_size)
-        if scale_col is None or scale_row is None:
-            print("Failed to estimate grid size.")
-            return None, None, image
-
-    size_x = int(round(scale_col))
-    size_y = int(round(scale_row))
-    x_coords, y_coords = refine_grids(image, size_x, size_y, refine_intensity)
+    x_coords, y_coords = compute_grid_coords(image, grid_size, min_size, peak_width, refine_intensity)
+    if x_coords is None:
+        print("Failed to estimate grid size.")
+        return None, None, image
 
     refined_size_x = len(x_coords) - 1
     refined_size_y = len(y_coords) - 1
@@ -409,8 +466,8 @@ def get_perfect_pixel(image, sample_method="center", grid_size = None, min_size 
     else:
         scaled_image = sample_center(image, x_coords, y_coords)
 
-    # fix square
-    if fix_square and abs(refined_size_x - refined_size_y) == 1:
+    # fix square (skip when grid size was explicitly specified)
+    if grid_size is None and fix_square and abs(refined_size_x - refined_size_y) == 1:
         # align to even sized square
         if refined_size_x > refined_size_y:
             if refined_size_x % 2 == 1:
