@@ -52,6 +52,70 @@ def _rgb_to_data_url(rgb):
     return f"data:image/png;base64,{b64}"
 
 
+def remove_background(rgb, tolerance=30.0):
+    """Make the solid color surrounding the subject transparent.
+
+    Flood-fills from the image borders: any pixel reachable from an edge
+    through colors within ``tolerance`` (Euclidean RGB distance) of the
+    dominant border color becomes transparent. Solid-color regions enclosed
+    by the subject are left untouched because they are not edge-connected.
+
+    Args:
+        rgb: uint8 RGB ndarray (H, W, 3).
+        tolerance: color distance threshold; higher removes more.
+
+    Returns:
+        uint8 RGBA ndarray (H, W, 4).
+    """
+    rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
+    H, W = rgb.shape[:2]
+    rgba = np.dstack([rgb, np.full((H, W), 255, dtype=np.uint8)])
+    if H == 0 or W == 0:
+        return rgba
+
+    flat = rgb.reshape(-1, 3).astype(np.int32)
+
+    # Dominant color along the border is taken as the background reference.
+    border = np.concatenate([
+        rgb[0, :, :], rgb[-1, :, :], rgb[:, 0, :], rgb[:, -1, :]
+    ], axis=0).astype(np.int32)
+    colors, counts = np.unique(border, axis=0, return_counts=True)
+    bg_color = colors[int(np.argmax(counts))]
+
+    tol_sq = float(tolerance) * float(tolerance)
+    diff = flat - bg_color[None, :]
+    matches = np.einsum("ij,ij->i", diff, diff) <= tol_sq
+
+    # BFS over the 4-connected grid, seeded from every border pixel that
+    # matches the background color.
+    visited = np.zeros(H * W, dtype=bool)
+    stack = []
+    for x in range(W):
+        for idx in (x, (H - 1) * W + x):
+            if matches[idx] and not visited[idx]:
+                visited[idx] = True
+                stack.append(idx)
+    for y in range(H):
+        for idx in (y * W, y * W + (W - 1)):
+            if matches[idx] and not visited[idx]:
+                visited[idx] = True
+                stack.append(idx)
+
+    while stack:
+        idx = stack.pop()
+        y, x = divmod(idx, W)
+        for ny, nx in ((y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)):
+            if 0 <= ny < H and 0 <= nx < W:
+                nidx = ny * W + nx
+                if matches[nidx] and not visited[nidx]:
+                    visited[nidx] = True
+                    stack.append(nidx)
+
+    alpha = rgba[..., 3].reshape(-1)
+    alpha[visited] = 0
+    return rgba
+
+
 def _parse_grid(form):
     """Return (grid_size, refine_intensity) from the request form.
 
@@ -122,8 +186,19 @@ def process():
     if out.dtype != np.uint8:
         out = np.clip(np.rint(out), 0, 255).astype(np.uint8)
 
-    result_img = Image.fromarray(out, mode="RGB")
-    scaled_img = result_img.resize((w * export_scale, h * export_scale), Image.NEAREST)
+    remove_bg = request.form.get("remove_bg", "false").lower() in ("1", "true", "on", "yes")
+    if remove_bg:
+        try:
+            bg_tolerance = float(request.form.get("bg_tolerance", 30))
+        except (TypeError, ValueError):
+            bg_tolerance = 30.0
+        rgba = remove_background(out, tolerance=bg_tolerance)
+        result_img = Image.fromarray(rgba, mode="RGBA")
+        resample = Image.NEAREST
+        scaled_img = result_img.resize((w * export_scale, h * export_scale), resample)
+    else:
+        result_img = Image.fromarray(out, mode="RGB")
+        scaled_img = result_img.resize((w * export_scale, h * export_scale), Image.NEAREST)
 
     def _img_to_data_url(pil_img):
         buf = io.BytesIO()

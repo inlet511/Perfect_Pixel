@@ -50,6 +50,15 @@
           <input type="number" id="export_scale" value="8" min="1" max="32" />
         </label>
       </div>
+
+      <div class="row">
+        <label><input type="checkbox" id="remove_bg" /> 去除背景（主体周边纯色 → 透明）</label>
+      </div>
+      <div class="row hidden" id="bg-tolerance-row">
+        <label>背景颜色容差: <span id="bt_val">30</span>
+          <input type="range" id="bg_tolerance" min="0" max="150" step="1" value="30" />
+        </label>
+      </div>
     </section>
 
     <section class="card">

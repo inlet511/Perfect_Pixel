@@ -34,6 +34,16 @@ $("refine_intensity").addEventListener("input", (e) => {
   $("ri_val").textContent = Number(e.target.value).toFixed(2);
 });
 
+// Toggle background-removal tolerance row.
+$("remove_bg").addEventListener("change", (e) => {
+  $("bg-tolerance-row").classList.toggle("hidden", !e.target.checked);
+});
+
+// Live label for the tolerance slider.
+$("bg_tolerance").addEventListener("input", (e) => {
+  $("bt_val").textContent = e.target.value;
+});
+
 function buildFormData() {
   const f = fileInput.files[0];
   if (!f) {
@@ -49,6 +59,8 @@ function buildFormData() {
   fd.append("refine_intensity", $("refine_intensity").value);
   fd.append("sample_method", $("sample_method").value);
   fd.append("export_scale", $("export_scale").value);
+  fd.append("remove_bg", $("remove_bg").checked ? "true" : "false");
+  fd.append("bg_tolerance", $("bg_tolerance").value);
   return fd;
 }
 
